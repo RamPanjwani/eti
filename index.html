@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCQ Study Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; }
+    .hidden { display: none; }
+    .topic-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2), -5px -5px 15px rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .topic-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 5px 5px 20px rgba(0, 0, 0, 0.3), -5px -5px 20px rgba(255, 255, 255, 0.1);
+    }
+    .sidebar {
+      transition: transform 0.3s ease;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      z-index: 30;
+    }
+    .sidebar.closed {
+      transform: translateX(-100%);
+    }
+    .option { padding: 6px 12px; border-radius: 6px; }
+    .correct-answer { background-color: #34d399; color: black; }
+    #sidebar-toggle:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+    }
+    @media (max-width: 640px) {
+      .topic-card { padding: 1rem; }
+      .text-lg { font-size: 1rem; }
+      .p-6 { padding: 1rem; }
+      .space-y-2 > * + * { margin-top: 0.5rem; }
+      .space-x-2 > * + * { margin-left: 0.5rem; }
+      .w-24 { width: 5rem; }
+      button { padding: 0.5rem; font-size: 0.875rem; }
+      button i { font-size: 1rem; }
+      .text-2xl { font-size: 1.5rem; }
+      .p-4 { padding: 1rem; }
+    }
+    html:not(.dark) {
+      background-color: #f3f4f6;
+      color: #1f2937;
+    }
+    html:not(.dark) .bg-gray-900 { background-color: #f3f4f6; }
+    html:not(.dark) .text-gray-200 { color: #1f2937; }
+    html:not(.dark) .bg-gray-800 { background-color: #ffffff; }
+    html:not(.dark) .border-gray-600 { border-color: #d1d5db; }
+    html:not(.dark) .bg-gray-700 { background-color: #e5e7eb; }
+    html:not(.dark) .text-white { color: #1f2937; }
+    html:not(.dark) .hover\:bg-gray-700:hover { background-color: #d1d5db; }
+    html:not(.dark) .bg-blue-600 { background-color: #2563eb; }
+    html:not(.dark) .hover\:bg-blue-700:hover { background-color: #1d4ed8; }
+    html:not(.dark) .bg-gray-600 { background-color: #6b7280; }
+    html:not(.dark) .hover\:bg-gray-500:hover { background-color: #4b5563; }
+    html:not(.dark) .bg-green-600 { background-color: #16a34a; }
+    html:not(.dark) .hover\:bg-green-700:hover { background-color: #15803d; }
+    html:not(.dark) .bg-gradient-to-r { background: linear-gradient(to right, #e0e7ff, #c7d2fe); }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-200 min-h-screen flex flex-col">
+  <!-- Navbar (Header) -->
+  <header class="bg-gradient-to-r from-gray-800 to-gray-700 p-4 sticky top-0 z-20 shadow-lg">
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center space-x-3 flex-shrink-0">
+        <button id="sidebar-toggle" class="text-white focus:outline-none p-2">
+          <i class="fas fa-bars text-xl"></i>
+        </button>
+        <h1 class="text-2xl font-bold text-white">MCQ Study Hub</h1>
+      </div>
+      <div class="flex items-center space-x-2 flex-wrap gap-2">
+        <div class="flex items-center space-x-2">
+          <input type="number" id="goto-question-input" placeholder="Q.No" min="1" class="w-24 p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <button id="goto-question-btn" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2">
+            <i class="fas fa-arrow-right"></i><span class="hidden sm:inline">Go</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <div class="flex flex-1 relative">
+    <!-- Sidebar (Hamburger Menu) -->
+    <aside id="sidebar" class="sidebar bg-gray-800 w-64 p-4 closed">
+      <h2 class="text-xl font-semibold mb-4 text-white flex items-center space-x-2">
+        <i class="fas fa-cog"></i><span>Menu</span>
+      </h2>
+      <div>
+        <button id="quiz-start-mobile" class="w-full bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 flex items-center space-x-2 mb-2">
+          <i class="fas fa-play"></i><span>Start Quiz</span>
+        </button>
+        <button id="theme-toggle-mobile" class="w-full bg-gray-600 text-white p-2 rounded-lg hover:bg-gray-500 flex items-center space-x-2">
+          <i class="fas fa-adjust"></i><span>Switch Mode</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Overlay for sidebar -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden"></div>
+
+    <!-- Study Content -->
+    <main class="flex-1 p-6 overflow-y-auto">
+      <div id="study-content" class="space-y-6"></div>
+    </main>
+  </div>
+
+  <script>
+    let studyMaterial = [];
+    let answerVisibility = JSON.parse(localStorage.getItem('answerVisibility')) || {};
+
+    // Load study material from JSON file
+    async function loadStudyMaterial() {
+      try {
+        const response = await fetch('questions.json');
+        studyMaterial = await response.json();
+        displayStudyMaterial(studyMaterial);
+      } catch (error) {
+        console.error('Error loading study material:', error);
+        alert('Failed to load study material. Please check the JSON file.');
+      }
+    }
+
+    // Display study material with options visible and answer highlighting
+    function displayStudyMaterial(data) {
+      const studyContent = document.getElementById('study-content');
+      studyContent.innerHTML = '';
+
+      data.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'topic-card bg-gray-800 p-6 rounded-lg';
+        card.id = `question-${item['Q.No']}`;
+
+        const isAnswerVisible = answerVisibility[item['Q.No']] || false;
+
+        card.innerHTML = `
+          <h3 class="text-lg font-semibold text-white mb-3 flex items-center space-x-2">
+            <i class="fas fa-question-circle"></i><span>Q.No ${item['Q.No']}: ${item.Question}</span>
+          </h3>
+          <div class="space-y-2 mb-4">
+            <p class="option ${isAnswerVisible && item.Answer === 'A' ? 'correct-answer' : ''}" id="option-a-${item['Q.No']}">A. ${item['Option A']}</p>
+            <p class="option ${isAnswerVisible && item.Answer === 'B' ? 'correct-answer' : ''}" id="option-b-${item['Q.No']}">B. ${item['Option B']}</p>
+            <p class="option ${isAnswerVisible && item.Answer === 'C' ? 'correct-answer' : ''}" id="option-c-${item['Q.No']}">C. ${item['Option C']}</p>
+            <p class="option ${isAnswerVisible && item.Answer === 'D' ? 'correct-answer' : ''}" id="option-d-${item['Q.No']}">D. ${item['Option D']}</p>
+          </div>
+          <div class="mt-4 flex justify-end">
+            <button onclick="toggleAnswer(${item['Q.No']}, '${item.Answer}')" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2">
+              <i class="fas fa-eye"></i><span>${isAnswerVisible ? 'Hide Answer' : 'Show Answer'}</span>
+            </button>
+          </div>
+        `;
+        studyContent.appendChild(card);
+      });
+    }
+
+    // Toggle answer visibility by highlighting the correct option
+    function toggleAnswer(qNo, correctAnswer) {
+      const isVisible = answerVisibility[qNo] || false;
+      answerVisibility[qNo] = !isVisible;
+      localStorage.setItem('answerVisibility', JSON.stringify(answerVisibility));
+
+      const options = {
+        'A': document.getElementById(`option-a-${qNo}`),
+        'B': document.getElementById(`option-b-${qNo}`),
+        'C': document.getElementById(`option-c-${qNo}`),
+        'D': document.getElementById(`option-d-${qNo}`)
+      };
+
+      Object.keys(options).forEach(key => {
+        if (key === correctAnswer && !isVisible) {
+          options[key].classList.add('correct-answer');
+        } else {
+          options[key].classList.remove('correct-answer');
+        }
+      });
+
+      const button = document.querySelector(`#question-${qNo} button`);
+      button.innerHTML = `<i class="fas fa-eye"></i><span>${!isVisible ? 'Hide Answer' : 'Show Answer'}</span>`;
+    }
+
+    // Go to question functionality
+    function setupGoToQuestion() {
+      const gotoInput = document.getElementById('goto-question-input');
+      const gotoButton = document.getElementById('goto-question-btn');
+
+      gotoButton.addEventListener('click', () => {
+        const qNo = parseInt(gotoInput.value);
+        if (isNaN(qNo) || qNo < 1 || qNo > studyMaterial.length) {
+          alert(`Please enter a valid question number (1 to ${studyMaterial.length}).`);
+          return;
+        }
+
+        const card = document.getElementById(`question-${qNo}`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          alert(`Question ${qNo} not found.`);
+        }
+      });
+
+      gotoInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') gotoButton.click();
+      });
+    }
+
+    // Theme toggle
+    function setupThemeToggle() {
+      const themeToggleMobile = document.getElementById('theme-toggle-mobile');
+      const isDark = localStorage.getItem('theme') === 'dark' || !localStorage.getItem('theme');
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        themeToggleMobile.innerHTML = '<i class="fas fa-adjust"></i><span>Switch to Light Mode</span>';
+      } else {
+        document.documentElement.classList.remove('dark');
+        themeToggleMobile.innerHTML = '<i class="fas fa-adjust"></i><span>Switch to Dark Mode</span>';
+      }
+
+      themeToggleMobile.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        const isDarkNow = document.documentElement.classList.contains('dark');
+        localStorage.setItem('theme', isDarkNow ? 'dark' : 'light');
+        themeToggleMobile.innerHTML = `<i class="fas fa-adjust"></i><span>${isDarkNow ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>`;
+        toggleSidebar();
+      });
+    }
+
+    // Sidebar toggle
+    function setupSidebarToggle() {
+      const sidebar = document.getElementById('sidebar');
+      const sidebarToggle = document.getElementById('sidebar-toggle');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+      function toggleSidebar() {
+        sidebar.classList.toggle('closed');
+        sidebarOverlay.classList.toggle('hidden');
+      }
+
+      sidebarToggle.addEventListener('click', toggleSidebar);
+      sidebarOverlay.addEventListener('click', toggleSidebar);
+    }
+
+    // Quiz start button
+    function setupQuizButton() {
+      const quizStartButtonMobile = document.getElementById('quiz-start-mobile');
+      quizStartButtonMobile.addEventListener('click', () => {
+        window.location.href = 'question.html';
+        toggleSidebar();
+      });
+    }
+
+    // Initialize the app
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStudyMaterial();
+      setupGoToQuestion();
+      setupThemeToggle();
+      setupSidebarToggle();
+      setupQuizButton();
+    });
+  </script>
+</body>
+</html>

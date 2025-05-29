@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Game with Timer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .option-label { cursor: pointer; transition: background-color 0.2s; }
+    .option-label:hover { background-color: #4b5563; }
+    .hidden { display: none; }
+    .timer-bar { height: 10px; background-color: #4b5563; border-radius: 5px; overflow: hidden; }
+    .timer-progress { height: 100%; background-color: #3b82f6; transition: width 0.1s linear; }
+    .main-panel {
+      width: 70%;
+      padding: 10px;
+    }
+    .review-panel {
+      width: 30%;
+      padding: 10px;
+      overflow-y: auto;
+      max-height: 70vh;
+    }
+    .question-box {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #6b7280;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .question-box:hover { opacity: 0.8; }
+  </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center">
+  <div class="bg-gray-800 text-gray-200 p-6 rounded-lg shadow-lg w-full max-w-6xl">
+    <!-- Start Screen -->
+    <div id="start-screen">
+      <h1 class="text-2xl font-bold mb-4 text-center text-white">Quiz Game</h1>
+      <p class="mb-4">Enter the range of questions and maximum questions to select:</p>
+      <div class="mb-4">
+        <label class="block text-sm font-medium">Start Question Number:</label>
+        <input type="number" id="start-question" min="1" value="1" class="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium">End Question Number:</label>
+        <input type="number" id="end-question" min="1" value="850" class="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white">
+      </div>
+      <p id="remaining-questions" class="mb-4 text-sm text-gray-400"></p>
+      <div class="mb-4">
+        <label class="block text-sm font-medium">Maximum Questions:</label>
+        <input type="number" id="max-questions" min="1" value="10" class="w-full p-2 border border-gray-600 rounded bg-gray-700 text-white">
+      </div>
+      <button id="start-quiz" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Start Quiz</button>
+      <p id="error-message" class="text-red-400 mt-2 hidden"></p>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div id="quiz-screen" class="hidden flex gap-4">
+      <!-- Main Panel -->
+      <div class="main-panel">
+        <h2 class="text-xl font-semibold mb-2 text-white">Question <span id="question-number"></span></h2>
+        <div class="flex justify-between mb-2">
+          <p>Time Left: <span id="timer">50</span>s</p>
+          <p>Question <span id="progress"></span> of <span id="total-questions"></span></p>
+        </div>
+        <div class="timer-bar"><div id="timer-progress" class="timer-progress"></div></div>
+        <p id="question-text" class="my-3 text-xl font-bold border-2 border-gray-600 p-2 rounded-lg"></p>
+        <div class="space-y-2">
+          <label class="option-label block p-2 border border-gray-600 rounded bg-gray-700">
+            <input type="radio" name="answer" value="A" class="mr-2 text-blue-500"> <span id="option-a"></span>
+          </label>
+          <label class="option-label block p-2 border border-gray-600 rounded bg-gray-700">
+            <input type="radio" name="answer" value="B" class="mr-2 text-blue-500"> <span id="option-b"></span>
+          </label>
+          <label class="option-label block p-2 border border-gray-600 rounded bg-gray-700">
+            <input type="radio" name="answer" value="C" class="mr-2 text-blue-500"> <span id="option-c"></span>
+          </label>
+          <label class="option-label block p-2 border border-gray-600 rounded bg-gray-700">
+            <input type="radio" name="answer" value="D" class="mr-2 text-blue-500"> <span id="option-d"></span>
+          </label>
+        </div>
+        <div class="mt-4 flex justify-between">
+          <button id="prev-question" class="bg-gray-600 text-gray-200 p-2 rounded hover:bg-gray-500">Previous</button>
+          <button id="next-question" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Next</button>
+        </div>
+      </div>
+      <!-- Review Panel -->
+      <div id="review-panel" class="review-panel grid grid-cols-6 gap-1"></div>
+    </div>
+
+    <!-- Report Screen -->
+    <div id="report-screen" class="hidden">
+      <h2 class="text-2xl font-bold mb-4 text-center text-white">Quiz Report</h2>
+      <p class="mb-2">Total Score: <span id="total-score"></span> / <span id="max-score"></span></p>
+      <p class="mb-2">Correct Answers: <span id="correct-count"></span></p>
+      <p class="mb-4">Incorrect Answers: <span id="incorrect-count"></span></p>
+      <div id="detailed-report" class="space-y-4"></div>
+      <div class="mt-4 flex space-x-2">
+        <button id="download-updated-json" class="flex-1 bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Download Updated Questions</button>
+        <button id="restart-quiz" class="flex-1 bg-green-600 text-white p-2 rounded hover:bg-green-700">Restart Quiz</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let questions = [];
+    let selectedQuestions = [];
+    let currentQuestionIndex = 0;
+    let userAnswers = [];
+    let questionStatus = [];
+    let totalMarks = 0;
+    let timerInterval = null;
+    const timePerQuestion = 50; // seconds
+
+    // Load questions from JSON file
+    async function loadQuestions() {
+      try {
+        const response = await fetch('questions.json');
+        questions = await response.json();
+        // Update max attributes dynamically
+        document.getElementById('start-question').max = questions.length ? Math.max(...questions.map(q => q['Q.No'])) : 1;
+        document.getElementById('end-question').max = questions.length ? Math.max(...questions.map(q => q['Q.No'])) : 1;
+        updateRemainingQuestions();
+      } catch (error) {
+        console.error('Error loading questions:', error);
+        alert('Failed to load questions. Please check the JSON file.');
+      }
+    }
+
+    // Update remaining questions display
+    function updateRemainingQuestions() {
+      const startQuestion = parseInt(document.getElementById('start-question').value) || 1;
+      const endQuestion = parseInt(document.getElementById('end-question').value) || 1;
+      const remaining = questions.filter(q => q['Q.No'] >= startQuestion && q['Q.No'] <= endQuestion).length;
+      document.getElementById('remaining-questions').textContent = `${remaining} MCQs remaining in the range`;
+      // Update max-questions max attribute
+      document.getElementById('max-questions').max = remaining;
+    }
+
+    // Shuffle array (Fisher-Yates algorithm) and track original indices
+    function shuffleArrayWithIndices(array) {
+      const indexedArray = array.map((item, index) => ({ item, originalIndex: index }));
+      for (let i = indexedArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indexedArray[i], indexedArray[j]] = [indexedArray[j], indexedArray[i]];
+      }
+      return indexedArray.map(({ item, originalIndex }) => ({ ...item, originalIndex }));
+    }
+
+    // Select random subset of questions
+    function getRandomQuestions(array, max) {
+      const shuffled = shuffleArrayWithIndices(array);
+      return shuffled.slice(0, Math.min(max, array.length));
+    }
+
+    // Update review panel
+    function updateReviewPanel() {
+      const reviewPanel = document.getElementById('review-panel');
+      reviewPanel.innerHTML = '';
+      selectedQuestions.forEach((question, index) => {
+        const box = document.createElement('span');
+        box.className = 'question-box';
+        box.textContent = question['Q.No'];
+        // Apply color based on status
+        if (questionStatus[index] === 'visited-attempted') {
+          box.classList.add('bg-green-500', 'text-black');
+        } else if (questionStatus[index] === 'visited-not-attempted') {
+          box.classList.add('bg-yellow-500', 'text-black');
+        } else {
+          box.classList.add('bg-gray-600', 'text-white');
+        }
+        box.addEventListener('click', () => goToQuestion(index));
+        reviewPanel.appendChild(box);
+      });
+    }
+
+    // Navigate to a specific question
+    function goToQuestion(index) {
+      if (index >= 0 && index < selectedQuestions.length && index !== currentQuestionIndex) {
+        saveAnswer();
+        clearInterval(timerInterval);
+        currentQuestionIndex = index;
+        showQuestion();
+      }
+    }
+
+    // Initialize the app
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadQuestions();
+
+      const startQuizBtn = document.getElementById('start-quiz');
+      const prevQuestionBtn = document.getElementById('prev-question');
+      const nextQuestionBtn = document.getElementById('next-question');
+      const restartQuizBtn = document.getElementById('restart-quiz');
+      const downloadJsonBtn = document.getElementById('download-updated-json');
+      const startQuestionInput = document.getElementById('start-question');
+      const endQuestionInput = document.getElementById('end-question');
+
+      startQuizBtn.addEventListener('click', startQuiz);
+      prevQuestionBtn.addEventListener('click', showPreviousQuestion);
+      nextQuestionBtn.addEventListener('click', showNextQuestion);
+      restartQuizBtn.addEventListener('click', restartQuiz);
+      downloadJsonBtn.addEventListener('click', downloadUpdatedJson);
+      startQuestionInput.addEventListener('input', updateRemainingQuestions);
+      endQuestionInput.addEventListener('input', updateRemainingQuestions);
+    });
+
+    function startQuiz() {
+      const startQuestion = parseInt(document.getElementById('start-question').value);
+      const endQuestion = parseInt(document.getElementById('end-question').value);
+      const maxQuestions = parseInt(document.getElementById('max-questions').value);
+      const errorMessage = document.getElementById('error-message');
+
+      // Validate input
+      if (isNaN(startQuestion) || isNaN(endQuestion) || startQuestion < 1 || startQuestion > endQuestion) {
+        errorMessage.textContent = `Please enter valid question numbers (1 to ${questions.length ? Math.max(...questions.map(q => q['Q.No'])) : 1}, start ≤ end).`;
+        errorMessage.classList.remove('hidden');
+        return;
+      }
+      const remainingInRange = questions.filter(q => q['Q.No'] >= startQuestion && q['Q.No'] <= endQuestion).length;
+      if (isNaN(maxQuestions) || maxQuestions < 1 || maxQuestions > remainingInRange) {
+        errorMessage.textContent = `Maximum questions must be between 1 and ${remainingInRange}.`;
+        errorMessage.classList.remove('hidden');
+        return;
+      }
+
+      errorMessage.classList.add('hidden');
+      // Select random questions up to maxQuestions
+      const questionRange = questions.filter(q => q['Q.No'] >= startQuestion && q['Q.No'] <= endQuestion);
+      selectedQuestions = getRandomQuestions(questionRange, maxQuestions);
+      totalMarks = selectedQuestions.reduce((sum, q) => sum + (q.Marks || 1), 0);
+      userAnswers = new Array(selectedQuestions.length).fill(null);
+      questionStatus = new Array(selectedQuestions.length).fill('not-visited');
+      currentQuestionIndex = 0;
+
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('quiz-screen').classList.remove('hidden');
+      showQuestion();
+    }
+
+    function startTimer() {
+      let timeLeft = timePerQuestion;
+      const timerDisplay = document.getElementById('timer');
+      const timerProgress = document.getElementById('timer-progress');
+
+      clearInterval(timerInterval);
+      timerDisplay.textContent = timeLeft;
+      timerProgress.style.width = '100%';
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        timerDisplay.textContent = timeLeft;
+        timerProgress.style.width = `${(timeLeft / timePerQuestion) * 100}%`;
+
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          showNextQuestion();
+        }
+      }, 1000);
+    }
+
+    function showQuestion() {
+      const question = selectedQuestions[currentQuestionIndex];
+      // Update question status
+      if (questionStatus[currentQuestionIndex] === 'not-visited') {
+        questionStatus[currentQuestionIndex] = userAnswers[currentQuestionIndex] ? 'visited-attempted' : 'visited-not-attempted';
+      }
+      document.getElementById('question-number').textContent = question['Q.No'];
+      document.getElementById('question-text').textContent = question.Question;
+      document.getElementById('option-a').textContent = question['Option A'];
+      document.getElementById('option-b').textContent = question['Option B'];
+      document.getElementById('option-c').textContent = question['Option C'];
+      document.getElementById('option-d').textContent = question['Option D'];
+      document.getElementById('progress').textContent = currentQuestionIndex + 1;
+      document.getElementById('total-questions').textContent = selectedQuestions.length;
+
+      // Set radio button state
+      const radios = document.getElementsByName('answer');
+      radios.forEach(radio => {
+        radio.checked = radio.value === userAnswers[currentQuestionIndex];
+      });
+
+      // Enable/disable navigation buttons
+      document.getElementById('prev-question').disabled = currentQuestionIndex === 0;
+      document.getElementById('next-question').textContent = currentQuestionIndex === selectedQuestions.length - 1 ? 'Submit' : 'Next';
+
+      // Update review panel
+      updateReviewPanel();
+
+      // Start timer
+      startTimer();
+    }
+
+    function showPreviousQuestion() {
+      if (currentQuestionIndex > 0) {
+        saveAnswer();
+        clearInterval(timerInterval);
+        currentQuestionIndex--;
+        showQuestion();
+      }
+    }
+
+    function showNextQuestion() {
+      saveAnswer();
+      clearInterval(timerInterval);
+      if (currentQuestionIndex < selectedQuestions.length - 1) {
+        currentQuestionIndex++;
+        showQuestion();
+      } else {
+        showReport();
+      }
+    }
+
+    function saveAnswer() {
+      const selected = document.querySelector('input[name="answer"]:checked');
+      userAnswers[currentQuestionIndex] = selected ? selected.value : null;
+      // Update status if attempted
+      if (userAnswers[currentQuestionIndex]) {
+        questionStatus[currentQuestionIndex] = 'visited-attempted';
+      } else if (questionStatus[currentQuestionIndex] === 'visited-attempted') {
+        questionStatus[currentQuestionIndex] = 'visited-not-attempted';
+      }
+      updateReviewPanel();
+    }
+
+    function showReport() {
+      clearInterval(timerInterval);
+      document.getElementById('quiz-screen').classList.add('hidden');
+      document.getElementById('report-screen').classList.remove('hidden');
+
+      let score = 0;
+      let correctCount = 0;
+      let incorrectCount = 0;
+      const detailedReport = document.getElementById('detailed-report');
+
+      // Sort questions by Q.No for report
+      const sortedQuestions = [...selectedQuestions].sort((a, b) => a['Q.No'] - b['Q.No']);
+
+      // Map user answers to sorted questions using originalIndex
+      const sortedAnswers = new Array(sortedQuestions.length).fill(null);
+      selectedQuestions.forEach((question, index) => {
+        const sortedIndex = sortedQuestions.findIndex(q => q['Q.No'] === question['Q.No']);
+        sortedAnswers[sortedIndex] = userAnswers[index];
+      });
+
+      // Collect Q.Nos of correctly answered questions
+      const correctQNos = [];
+      sortedQuestions.forEach((question, index) => {
+        const userAnswer = sortedAnswers[index];
+        const isCorrect = userAnswer === question.Answer;
+        if (isCorrect) {
+          score += question.Marks || 1;
+          correctCount++;
+          correctQNos.push(question['Q.No']); // Add Q.No of correctly answered question
+        } else if (userAnswer !== null) {
+          incorrectCount++;
+        }
+
+        const reportItem = document.createElement('div');
+        reportItem.className = 'border border-gray-600 p-2 rounded bg-gray-700';
+        reportItem.innerHTML = `
+          <p><strong>Q${question['Q.No']}:</strong> ${question.Question}</p>
+          <p>Your Answer: ${userAnswer || 'Not answered'} (${userAnswer ? question[`Option ${userAnswer}`] : ''})</p>
+          <p>Correct Answer: ${question.Answer} (${question[`Option ${question.Answer}`]})</p>
+          <p>Marks: ${isCorrect ? (question.Marks || 1) : 0}/${question.Marks || 1}</p>
+          <p class="${isCorrect ? 'text-green-400' : 'text-red-400'}">${isCorrect ? 'Correct' : 'Incorrect'}</p>
+        `;
+        detailedReport.appendChild(reportItem);
+      });
+
+      document.getElementById('total-score').textContent = score;
+      document.getElementById('max-score').textContent = totalMarks;
+      document.getElementById('correct-count').textContent = correctCount;
+      document.getElementById('incorrect-count').textContent = incorrectCount;
+
+      // Remove only correctly answered questions from questions array
+      questions = questions.filter(q => !correctQNos.includes(q['Q.No']));
+
+      // Save results to JSON
+      const results = sortedQuestions.map((q, i) => ({
+        QNo: q['Q.No'],
+        Question: q.Question,
+        UserAnswer: sortedAnswers[i],
+        CorrectAnswer: q.Answer,
+        Marks: sortedAnswers[i] === q.Answer ? (q.Marks || 1) : 0
+      }));
+      console.log('Results:', results);
+    }
+
+    function downloadUpdatedJson() {
+      const blob = new Blob([JSON.stringify(questions, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'questions.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function restartQuiz() {
+      clearInterval(timerInterval);
+      document.getElementById('report-screen').classList.add('hidden');
+      document.getElementById('start-screen').classList.remove('hidden');
+      document.getElementById('detailed-report').innerHTML = '';
+      document.getElementById('start-question').value = '1';
+      document.getElementById('end-question').value = questions.length ? Math.max(...questions.map(q => q['Q.No'])) : 1;
+      document.getElementById('max-questions').value = '10';
+      // Update max attributes
+      document.getElementById('start-question').max = questions.length ? Math.max(...questions.map(q => q['Q.No'])) : 1;
+      document.getElementById('end-question').max = questions.length ? Math.max(...questions.map(q => q['Q.No'])) : 1;
+      updateRemainingQuestions();
+    }
+  </script>
+</body>
+</html>
